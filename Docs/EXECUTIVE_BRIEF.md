@@ -6,6 +6,19 @@ See `README.md` for the full data disclosure.
 
 ---
 
+## At a glance
+
+| # | Finding | Confidence | What would confirm it |
+|---|---|---|---|
+| 1 | Weekday demand about 4.6x higher than weekend | **Strong** | Already holds across a full month, would carry over directly to real ridership data |
+| 2 | Cibubur to Balai Kota is busiest and most volatile | **Moderate** | Real bus counts and schedule data, to tell demand apart from actual capacity pressure |
+| 3 | Evening peak trips take longer than morning peak | **Moderate** | Real GPS/AVL data, since duration here is generated within a fixed 15 to 180 min range, not measured |
+| 4 | Gender split varies notably by corridor | **Moderate** | Real, non-synthetic demographic data before it can inform any service decision |
+| 5 | Missing-record rate is slightly higher in some corridors | **Weak** | A larger or real sample, current gap (8.6% to 11% vs. 6% baseline) sits close to noise on small n |
+
+Full reasoning for each finding is below. The short version: only #1 is strong enough to act
+on directly. Everything else needs real operational data before it should drive a decision.
+
 ## Findings
 
 Each finding is labeled by how much you should trust it: **Strong** (large sample, clear
@@ -38,12 +51,18 @@ balanced or lean female (Kebayoran Lama to Tanah Abang: 52.3% female, Pulo Gadun
 to add services like priority seating or women only buses. But since this is synthetic
 data, it can't justify a real decision on its own.
 
-### 5. Missing records are a bit higher in some corridors, but not clearly concentrated. Weak.
-The corridors with the most missing transaction data sit around 8.6% to 11%, compared to
-the dataset wide average of about 6%. But these corridors only have 82 to 244 records each,
-and the rates are all close together rather than showing one or two clear standouts. This
-is more likely just random noise around the average, not a real problem specific to those
-corridors. Worth keeping an eye on, not worth acting on yet.
+### 5. Missing records are slightly higher in some corridors, but are not strongly concentrated. Weak.
+Some corridors show incomplete-record rates around 8.6% to 11%, compared with a dataset wide
+average of about 6%. But these corridors have relatively small sample sizes, and the rates
+are fairly close together. The pattern is also consistent across days of the week:
+incomplete-record rates range from 10.12% on Tuesday to 11.59% on Sunday, a difference of
+only 1.47 percentage points. This suggests incomplete records are not strongly concentrated
+in a particular corridor or day.
+
+Treat this as a data quality monitoring issue rather than an immediate operational problem.
+Keep tracking incomplete records across corridors and time periods, and investigate further
+using a larger or real transaction dataset before allocating resources to a specific
+location or day.
 
 ---
 
@@ -60,10 +79,11 @@ This is the strongest, best supported finding here. If weekend schedules aren't 
 scaled down to match, this is a low risk place to start, since the demand gap is large
 enough to hold up even with the usual caveats about synthetic data.
 
-### 3. Treat the missing data pattern as something to monitor, not something to act on
-Rather than reacting to which corridors have slightly more missing records right now, log
-it and check again with a bigger or real dataset later. Acting on a pattern this close to
-random noise risks sending maintenance or inspection resources to the wrong places.
+### 3. Monitor incomplete transaction records rather than targeting a specific corridor or day
+Incomplete-record rates vary only modestly across both corridors and days of the week.
+Rather than reacting to small differences in the current synthetic sample, keep monitoring
+data completeness and validate the pattern using a larger or real transaction dataset before
+directing maintenance or inspection resources to a specific corridor or day.
 
 ---
 

@@ -56,8 +56,8 @@ Python, DuckDB, pandas, matplotlib
 
 ```
 transjakarta_analysis.ipynb   the full analysis notebook (Q1 to Q12)
-docs/README.md                 this file
-docs/EXECUTIVE_BRIEF.md         summary of findings and recommendations
+README.md                      this file
+docs/EXECUTIVE_BRIEF.md        summary of findings and recommendations
 Transjakarta.csv               the dataset (or fetch it from Kaggle, see above)
 ```
 
