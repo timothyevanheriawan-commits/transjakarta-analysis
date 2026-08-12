@@ -50,27 +50,40 @@ what the data can and can't prove.
 
 ## Tech stack
 
-Python, DuckDB, pandas, matplotlib
+Python, DuckDB, pandas, matplotlib, Streamlit (interactive dashboard)
 
 ## Repository structure
 
 ```
-transjakarta_analysis.ipynb   the full analysis notebook (Q1 to Q12)
-README.md                      this file
-docs/EXECUTIVE_BRIEF.md        summary of findings and recommendations
-Transjakarta.csv               the dataset (or fetch it from Kaggle, see above)
+app.py                          interactive Streamlit dashboard (see "Run the dashboard" below)
+.streamlit/config.toml          dashboard theme
+transjakarta.csv                dataset copy used by app.py
+transjakarta_analysis.ipynb     the full analysis notebook (Q1 to Q12)
+README.md                       this file
+Docs/EXECUTIVE_BRIEF.md         summary of findings and recommendations
+Transjakarta.csv                the dataset (or fetch it from Kaggle, see above)
 ```
 
-## How to run
+## How to run the notebook
 
 ```bash
-pip install duckdb pandas matplotlib jupyter
+pip install duckdb pandas matplotlib jupyter scipy
 jupyter notebook transjakarta_analysis.ipynb
 ```
 
 On Kaggle, add the dataset through "Add Data" and point `read_csv_auto()` at the path shown
 under `/kaggle/input/`. Double check the exact filename first: Kaggle reuploads sometimes
 rename the source CSV.
+
+## Run the dashboard
+
+```bash
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+Or deploy directly on Streamlit Community Cloud pointed at `app.py` - `transjakarta.csv` and
+the theme in `.streamlit/config.toml` ship with the repo, so it works with zero setup.
 
 ## Related project
 

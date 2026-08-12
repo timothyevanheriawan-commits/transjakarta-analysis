@@ -1,0 +1,40 @@
+# Streamlit native theming - "Papan Info": the LED departure board bolted
+# to the wall of a TransJakarta halte (bus shelter). Ink-navy panel, amber
+# LED digits for the numbers that matter, a cyan "route line" for anything
+# clickable. A dark theme on purpose - it's meant to feel like reading a
+# real transit sign at night, not like a generic dark-mode dashboard.
+
+[theme]
+base = "dark"
+
+primaryColor = "#f2a93c"
+backgroundColor = "#0f1b30"
+secondaryBackgroundColor = "#16273f"
+textColor = "#eef2f8"
+linkColor = "#5fc9d8"
+
+borderColor = "#2c3f5e"
+dataframeBorderColor = "#2c3f5e"
+dataframeHeaderBackgroundColor = "#16273f"
+showWidgetBorder = true
+showSidebarBorder = true
+
+# Halte signage is boxy and riveted, not soft plastic - small radius only,
+# just enough to keep it from feeling like raw HTML.
+baseRadius = "small"
+buttonRadius = "small"
+
+# Eight route-line colors, picked to look like distinct lines on a transit
+# schematic map (the way each corridor gets its own color on TransJakarta's
+# own network map) rather than a generic chart palette.
+chartCategoricalColors = [
+    "#f2a93c", "#5fc9d8", "#e0607e", "#7cc47f",
+    "#a78bda", "#e8935a", "#4f8fd9", "#d9c25a",
+]
+
+# Plus Jakarta Sans - a real typeface literally named for this project's
+# city, used as the body/UI face rather than a generic grotesk. The other
+# half of the signature, JetBrains Mono for corridor codes and LED-style
+# numerals, is loaded separately in app.py since Streamlit's theme only
+# takes one font family here.
+font = "Plus Jakarta Sans:https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
