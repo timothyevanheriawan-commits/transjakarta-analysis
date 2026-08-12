@@ -249,7 +249,7 @@ def load_data(path):
     return df
 
 
-CSV_PATH = "transjakarta.csv"
+CSV_PATH = "Transjakarta.csv"
 if not os.path.exists(CSV_PATH):
     st.error(f"Can't find **{CSV_PATH}** next to app.py. Make sure the dataset CSV ships with the repo.")
     st.stop()
