@@ -87,7 +87,7 @@ the theme in `.streamlit/config.toml` ship with the repo, so it works with zero 
 
 ## Related project
 
-This project pairs with an [Olist Brazilian E-Commerce](#) analysis in the same portfolio.
+This project pairs with an [Olist Brazilian E-Commerce](https://github.com/timothyevanheriawan-commits/olist-ecommerce-analysis) analysis in the same portfolio.
 That one covers e-commerce and logistics analytics on real transaction data. This one covers
 transit and urban mobility analytics on synthetic data built over a real network structure.
 Together they show range across domains, and an honest approach to where the data actually
