@@ -9,8 +9,7 @@ import os
 import numpy as np
 import pandas as pd
 import streamlit as st
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
+import plotly.graph_objects as go
 
 # ----------------------------------------------------------------------------
 # THEME - "Papan Info": the LED departure board bolted to the wall of a
@@ -18,9 +17,9 @@ import matplotlib.dates as mdates
 # numbers that matter, a cyan "route line" color for anything clickable.
 #
 # Colors for Streamlit's own UI live in .streamlit/config.toml, not here.
-# These constants exist only because matplotlib is a separate rendering
-# pipeline that doesn't read Streamlit's theme, so chart colors still need
-# to be set in Python and kept in sync by hand.
+# These constants exist only because Plotly is a separate rendering pipeline
+# that doesn't read Streamlit's theme, so chart colors still need to be set
+# in Python (via style_fig, below) and kept in sync by hand.
 # ----------------------------------------------------------------------------
 BG = "#0f1b30"
 PANEL = "#16273f"
@@ -78,38 +77,52 @@ st.set_page_config(
     layout="wide",
 )
 
-plt.rcParams.update({
-    "figure.facecolor": BG,
-    "axes.facecolor": BG,
-    "axes.edgecolor": BORDER,
-    "axes.labelcolor": TEXT,
-    "text.color": TEXT,
-    "xtick.color": TEXT_DIM,
-    "ytick.color": TEXT_DIM,
-    "grid.color": BORDER,
-    "font.family": "sans-serif",
-})
+# ----------------------------------------------------------------------------
+# CHART THEME (Plotly) - every chart on this page is Plotly rather than a
+# static image, so viewers can hover a bar/point and see the exact value
+# instead of eyeballing pixel height against gridlines. Plus Jakarta Sans is
+# already loaded on the page (via .streamlit/config.toml's font import), so
+# Plotly can reference it directly without a separate font-download step.
+# ----------------------------------------------------------------------------
+FONT_FAMILY = "Plus Jakarta Sans, sans-serif"
 
-# Matplotlib doesn't know about web fonts by default, so chart images would
-# otherwise fall back to whatever generic sans-serif is installed on the
-# machine - which wouldn't match the page's Plus Jakarta Sans. Downloading
-# and registering the actual font file gets chart text to match the rest
-# of the page; if that fails for any reason (no internet at chart-render
-# time, etc.), it just falls back to the default sans-serif rather than
-# breaking the app.
-try:
-    import matplotlib.font_manager as fm
-    import urllib.request
-    import tempfile
 
-    _font_url = "https://github.com/google/fonts/raw/main/ofl/plusjakartasans/PlusJakartaSans%5Bwght%5D.ttf"
-    _font_path = os.path.join(tempfile.gettempdir(), "PlusJakartaSans.ttf")
-    if not os.path.exists(_font_path):
-        urllib.request.urlretrieve(_font_url, _font_path)
-    fm.fontManager.addfont(_font_path)
-    plt.rcParams["font.family"] = fm.FontProperties(fname=_font_path).get_name()
-except Exception:
-    pass
+def style_fig(fig, height=380, xaxis_title=None, yaxis_title=None, showlegend=False):
+    """Apply the shared 'Papan Info' theme to a Plotly figure and return it."""
+    fig.update_layout(
+        paper_bgcolor=BG,
+        plot_bgcolor=BG,
+        font=dict(family=FONT_FAMILY, color=TEXT, size=13),
+        margin=dict(l=10, r=10, t=10, b=10),
+        height=height,
+        showlegend=showlegend,
+        legend=dict(font=dict(size=11, color=TEXT_DIM), bgcolor="rgba(0,0,0,0)"),
+        hoverlabel=dict(bgcolor=PANEL, font=dict(family=FONT_FAMILY, color=TEXT, size=12),
+                         bordercolor=BORDER),
+        bargap=0.25,
+    )
+    fig.update_xaxes(gridcolor=BORDER, zerolinecolor=BORDER, title=xaxis_title,
+                      color=TEXT_DIM, linecolor=BORDER)
+    fig.update_yaxes(gridcolor=BORDER, zerolinecolor=BORDER, title=yaxis_title,
+                      color=TEXT_DIM, linecolor=BORDER)
+    return fig
+
+
+CONFIDENCE_COLORS = {"Strong": "#7cc47f", "Moderate": ACCENT, "Weak": WARN}
+
+
+def confidence_badge(level):
+    """Small inline pill next to a 'Quick take' showing how much weight the
+    finding can carry - Strong / Moderate / Weak, matching the framework
+    used throughout the notebook and the Executive Brief."""
+    color = CONFIDENCE_COLORS.get(level, TEXT_DIM)
+    st.markdown(
+        f'<span style="display:inline-block; font-family:\'JetBrains Mono\',monospace; '
+        f'font-size:0.68rem; font-weight:700; letter-spacing:0.05em; text-transform:uppercase; '
+        f'color:{BG}; background:{color}; padding:2px 9px; border-radius:3px; margin-bottom:6px;">'
+        f'{level} confidence</span>',
+        unsafe_allow_html=True,
+    )
 
 # Colors, backgrounds, borders, and the base font are all set natively in
 # .streamlit/config.toml - Streamlit's theme engine handles those more
@@ -368,7 +381,7 @@ else:
 
 tabs = st.tabs([
     "Overview", "Demand Patterns", "Corridors & Map",
-    "Passengers", "Trip Duration", "Data Quality",
+    "Passengers", "Trip Duration", "Data Quality", "Executive Brief",
 ])
 
 # ============================================================ TAB: OVERVIEW
@@ -406,13 +419,13 @@ with tabs[0]:
     missing = (df.isna().mean() * 100).round(1)
     missing = missing[missing > 0].sort_values(ascending=False).head(15).sort_values()
     if len(missing) > 0:
-        fig, ax = plt.subplots(figsize=(8, max(2.5, len(missing) * 0.35)))
-        ax.barh(missing.index, missing.values, color=ACCENT)
-        ax.set_xlabel("% missing")
-        ax.grid(axis="x", alpha=0.25)
-        for spine in ("top", "right"):
-            ax.spines[spine].set_visible(False)
-        st.pyplot(fig)
+        fig = go.Figure(go.Bar(
+            x=missing.values, y=missing.index, orientation="h",
+            marker_color=ACCENT,
+            hovertemplate="%{y}<br>%{x:.1f}% missing<extra></extra>",
+        ))
+        style_fig(fig, height=max(220, len(missing) * 32), xaxis_title="% missing")
+        st.plotly_chart(fig, use_container_width=True)
     else:
         st.success("No missing values in the current filtered view.")
 
@@ -421,15 +434,13 @@ with tabs[0]:
         "e-money products layered onto the synthetic transactions:"
     )
     bank_counts = df["_bank_label"].value_counts()
-    fig, ax = plt.subplots(figsize=(8, 3.5))
-    ax.bar(bank_counts.index, bank_counts.values, color=QUALITATIVE[:len(bank_counts)])
-    ax.set_ylabel("Trips")
-    ax.grid(axis="y", alpha=0.25)
-    ax.tick_params(axis="x", rotation=20)
-    for spine in ("top", "right"):
-        ax.spines[spine].set_visible(False)
-    plt.tight_layout()
-    st.pyplot(fig)
+    fig = go.Figure(go.Bar(
+        x=bank_counts.index, y=bank_counts.values,
+        marker_color=QUALITATIVE[:len(bank_counts)],
+        hovertemplate="%{x}<br>%{y:,} trips<extra></extra>",
+    ))
+    style_fig(fig, height=340, yaxis_title="Trips")
+    st.plotly_chart(fig, use_container_width=True)
 
 # ============================================================ TAB: DEMAND
 with tabs[1]:
@@ -441,6 +452,7 @@ with tabs[1]:
     we_avg = daily.loc[daily["_is_weekend"], "trips"].mean()
     if pd.notna(wd_avg) and pd.notna(we_avg) and we_avg > 0:
         ratio = wd_avg / we_avg
+        confidence_badge("Strong")
         st.markdown(
             f"**Quick take:** weekday demand averages **{wd_avg:,.0f} trips/day**, versus "
             f"**{we_avg:,.0f} trips/day** on weekends - about **{ratio:.1f}x higher**. This "
@@ -453,22 +465,45 @@ with tabs[1]:
         st.info("Not enough weekday and weekend data in the current filter to compare the two.")
 
     st.markdown(
+        "**Daily trip volume across April.** Every point is one day's total trips - this is "
+        "the shape of the whole month, not just an hour-of-day or day-of-week average."
+    )
+    daily_all = df.groupby("_date").size().reset_index(name="trips").sort_values("_date")
+    fig = go.Figure(go.Scatter(
+        x=daily_all["_date"], y=daily_all["trips"], mode="lines+markers",
+        line=dict(color=ACCENT, width=2), marker=dict(size=5, color=ACCENT),
+        hovertemplate="%{x|%a, %b %d}<br>%{y:,} trips<extra></extra>",
+    ))
+    # Cuti bersama Idul Fitri 2023 ran Apr 19-25 - shaded so the dip (or lack of
+    # one, in this synthetic sample) is visible in context, since a real analyst
+    # would ask about this before trusting a weekday/weekend average from this month.
+    lebaran_start, lebaran_end = pd.Timestamp("2023-04-19"), pd.Timestamp("2023-04-25")
+    if daily_all["_date"].min() <= lebaran_end.date() and daily_all["_date"].max() >= lebaran_start.date():
+        fig.add_vrect(x0=lebaran_start, x1=lebaran_end, fillcolor=WARN, opacity=0.12, line_width=0)
+    style_fig(fig, height=360, yaxis_title="Trips")
+    st.plotly_chart(fig, use_container_width=True)
+    st.caption(
+        "Shaded band: Idul Fitri cuti bersama (Apr 19-25, 2023), the largest national travel "
+        "disruption of the month. Worth checking before trusting any weekday/weekend average "
+        "from this dataset - a real Lebaran period would depress or reshape weekday ridership, "
+        "and this synthetic dataset may or may not model that (see Data Quality tab for how "
+        "much to trust findings drawn from a single month)."
+    )
+
+    st.markdown(
         "**Trips by hour of day.** The two humps below are the morning and evening commute - "
         "shaded to match the peak windows used throughout this app."
     )
     hourly = df["_hour"].value_counts().reindex(range(24), fill_value=0).sort_index()
-    fig, ax = plt.subplots(figsize=(10, 4))
-    ax.bar(hourly.index, hourly.values, color=ACCENT, width=0.7)
-    ax.axvspan(4.5, 9.5, color=LINE, alpha=0.12)
-    ax.axvspan(15.5, 20.5, color=LINE, alpha=0.12)
-    ax.set_xticks(range(0, 24, 2))
-    ax.set_xlabel("Hour of day (tap-in)")
-    ax.set_ylabel("Trips")
-    ax.grid(axis="y", alpha=0.25)
-    for spine in ("top", "right"):
-        ax.spines[spine].set_visible(False)
-    plt.tight_layout()
-    st.pyplot(fig)
+    fig = go.Figure(go.Bar(
+        x=hourly.index, y=hourly.values, marker_color=ACCENT,
+        hovertemplate="%{x}:00<br>%{y:,} trips<extra></extra>",
+    ))
+    fig.add_vrect(x0=4.5, x1=9.5, fillcolor=LINE, opacity=0.12, line_width=0)
+    fig.add_vrect(x0=15.5, x1=20.5, fillcolor=LINE, opacity=0.12, line_width=0)
+    style_fig(fig, height=360, xaxis_title="Hour of day (tap-in)", yaxis_title="Trips")
+    fig.update_xaxes(dtick=2)
+    st.plotly_chart(fig, use_container_width=True)
     st.caption(
         "Shaded bands mark the morning peak (05:00-09:59) and evening peak (16:00-20:59) used "
         "on the Trip Duration tab. Everything outside those bands is treated as off-peak."
@@ -478,14 +513,12 @@ with tabs[1]:
     order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     by_day = df["_day_name"].value_counts().reindex(order, fill_value=0)
     colors = [ACCENT if d not in ("Saturday", "Sunday") else LINE for d in order]
-    fig, ax = plt.subplots(figsize=(10, 4))
-    ax.bar(by_day.index, by_day.values, color=colors)
-    ax.set_ylabel("Trips")
-    ax.grid(axis="y", alpha=0.25)
-    for spine in ("top", "right"):
-        ax.spines[spine].set_visible(False)
-    plt.tight_layout()
-    st.pyplot(fig)
+    fig = go.Figure(go.Bar(
+        x=by_day.index, y=by_day.values, marker_color=colors,
+        hovertemplate="%{x}<br>%{y:,} trips<extra></extra>",
+    ))
+    style_fig(fig, height=360, yaxis_title="Trips")
+    st.plotly_chart(fig, use_container_width=True)
     st.caption("Amber bars are weekdays, cyan bars are the weekend, so the drop is visible at a glance.")
 
 # ============================================================ TAB: CORRIDORS
@@ -505,6 +538,7 @@ with tabs[2]:
         volatility = daily_by_corridor.groupby("corridorName")["trips"].std().sort_values(ascending=False)
         most_volatile = volatility.index[0] if len(volatility) > 0 else None
 
+        confidence_badge("Moderate")
         st.markdown(
             f"**Quick take:** {corridor_badge(busiest_name)} is the busiest corridor in this "
             f"view, with **{busiest_count:,} trips**. Among the top 10 by volume, "
@@ -516,14 +550,12 @@ with tabs[2]:
 
     st.markdown("**Top 15 corridors by trip volume.**")
     top15 = corridor_counts.head(15).sort_values()
-    fig, ax = plt.subplots(figsize=(9, 6))
-    ax.barh(top15.index, top15.values, color=ACCENT)
-    ax.set_xlabel("Trips")
-    ax.grid(axis="x", alpha=0.25)
-    for spine in ("top", "right"):
-        ax.spines[spine].set_visible(False)
-    plt.tight_layout()
-    st.pyplot(fig)
+    fig = go.Figure(go.Bar(
+        x=top15.values, y=top15.index, orientation="h", marker_color=ACCENT,
+        hovertemplate="%{y}<br>%{x:,} trips<extra></extra>",
+    ))
+    style_fig(fig, height=460, xaxis_title="Trips")
+    st.plotly_chart(fig, use_container_width=True)
 
     st.markdown(
         "**Day-to-day volatility, top 10 corridors.** A higher bar means that corridor's daily "
@@ -531,15 +563,13 @@ with tabs[2]:
         "a fixed schedule might be a worse fit than one built for high demand variance."
     )
     if len(volatility) > 0:
-        fig, ax = plt.subplots(figsize=(9, 4.5))
         vol_sorted = volatility.sort_values()
-        ax.barh(vol_sorted.index, vol_sorted.values, color=LINE)
-        ax.set_xlabel("Std. dev. of trips/day")
-        ax.grid(axis="x", alpha=0.25)
-        for spine in ("top", "right"):
-            ax.spines[spine].set_visible(False)
-        plt.tight_layout()
-        st.pyplot(fig)
+        fig = go.Figure(go.Bar(
+            x=vol_sorted.values, y=vol_sorted.index, orientation="h", marker_color=LINE,
+            hovertemplate="%{y}<br>std. dev. %{x:.1f} trips/day<extra></extra>",
+        ))
+        style_fig(fig, height=360, xaxis_title="Std. dev. of trips/day")
+        st.plotly_chart(fig, use_container_width=True)
 
     st.markdown("**Where trips start.** Every dot is a real stop location, sized by how many tap-ins happened there.")
     stop_points = (
@@ -572,6 +602,7 @@ with tabs[3]:
     if len(gender_counts) > 0:
         top_gender = gender_counts.index[0]
         top_share = gender_counts.iloc[0] / gender_counts.sum() * 100
+        confidence_badge("Moderate")
         st.markdown(
             f"**Quick take:** **{top_gender}**-registered cards account for **{top_share:.0f}%** "
             "of trips in the current filter. This split varies a fair amount by corridor - try "
@@ -581,39 +612,59 @@ with tabs[3]:
     c1, c2 = st.columns(2)
     with c1:
         st.markdown("**Gender split.**")
-        fig, ax = plt.subplots(figsize=(5, 4))
-        ax.bar(gender_counts.index, gender_counts.values, color=[ACCENT, LINE][:len(gender_counts)])
-        ax.set_ylabel("Trips")
-        ax.grid(axis="y", alpha=0.25)
-        for spine in ("top", "right"):
-            ax.spines[spine].set_visible(False)
-        plt.tight_layout()
-        st.pyplot(fig)
+        fig = go.Figure(go.Bar(
+            x=gender_counts.index, y=gender_counts.values,
+            marker_color=[ACCENT, LINE][:len(gender_counts)],
+            hovertemplate="%{x}<br>%{y:,} trips<extra></extra>",
+        ))
+        style_fig(fig, height=340, yaxis_title="Trips")
+        st.plotly_chart(fig, use_container_width=True)
     with c2:
         st.markdown("**Age distribution.**")
         ages = df["_age"].dropna()
         ages = ages[(ages >= 10) & (ages <= 85)]
-        fig, ax = plt.subplots(figsize=(5, 4))
-        ax.hist(ages, bins=25, color=ACCENT, edgecolor=BG)
-        ax.set_xlabel("Age (years)")
-        ax.set_ylabel("Trips")
-        ax.grid(axis="y", alpha=0.25)
-        for spine in ("top", "right"):
-            ax.spines[spine].set_visible(False)
-        plt.tight_layout()
-        st.pyplot(fig)
+        fig = go.Figure(go.Histogram(
+            x=ages, nbinsx=25, marker_color=ACCENT, marker_line_color=BG, marker_line_width=1,
+            hovertemplate="Age %{x}<br>%{y:,} trips<extra></extra>",
+        ))
+        style_fig(fig, height=340, xaxis_title="Age (years)", yaxis_title="Trips")
+        st.plotly_chart(fig, use_container_width=True)
 
     st.markdown("**Fare paid per trip.** A large cluster at Rp 0 is expected - Transjakarta's transfer window lets riders continue a trip without paying again.")
     fares = df["payAmount"].dropna()
-    fig, ax = plt.subplots(figsize=(10, 3.5))
-    ax.hist(fares, bins=30, color=ACCENT, edgecolor=BG)
-    ax.set_xlabel("Fare (Rp)")
-    ax.set_ylabel("Trips")
-    ax.grid(axis="y", alpha=0.25)
-    for spine in ("top", "right"):
-        ax.spines[spine].set_visible(False)
-    plt.tight_layout()
-    st.pyplot(fig)
+    fig = go.Figure(go.Histogram(
+        x=fares, nbinsx=30, marker_color=ACCENT, marker_line_color=BG, marker_line_width=1,
+        hovertemplate="Rp %{x:,.0f}<br>%{y:,} trips<extra></extra>",
+    ))
+    style_fig(fig, height=320, xaxis_title="Fare (Rp)", yaxis_title="Trips")
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown(
+        "**Payment method mix, top 5 corridors.** Whether one payment brand dominates a "
+        "corridor, or riders there use a healthier mix - relevant if a bank partnership or "
+        "top-up campaign were ever being considered for a specific route."
+    )
+    top5_corridors = df["corridorName"].value_counts().head(5).index
+    pay_mix = (
+        df[df["corridorName"].isin(top5_corridors)]
+        .groupby(["corridorName", "_bank_label"]).size()
+        .unstack(fill_value=0)
+    )
+    pay_mix = pay_mix.loc[top5_corridors]  # keep corridors ordered by overall volume
+    pay_mix_pct = pay_mix.div(pay_mix.sum(axis=1), axis=0) * 100
+    if len(pay_mix_pct) > 0:
+        fig = go.Figure()
+        for i, bank in enumerate(pay_mix_pct.columns):
+            fig.add_trace(go.Bar(
+                name=bank, x=pay_mix_pct.index, y=pay_mix_pct[bank],
+                marker_color=QUALITATIVE[i % len(QUALITATIVE)],
+                hovertemplate=f"{bank}" + "<br>%{x}<br>%{y:.0f}%<extra></extra>",
+            ))
+        fig.update_layout(barmode="stack")
+        style_fig(fig, height=400, yaxis_title="% of trips", showlegend=True)
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("Not enough corridors in the current filter to show a payment-method breakdown.")
 
 # ============================================================ TAB: DURATION
 with tabs[4]:
@@ -640,6 +691,7 @@ with tabs[4]:
     if len(by_peak) >= 2:
         longest = by_peak.idxmax()
         shortest = by_peak.idxmin()
+        confidence_badge("Moderate")
         st.markdown(
             f"**Quick take:** average trip duration is longest in the **{longest}** window "
             f"(**{by_peak.max():.0f} min**) and shortest in the **{shortest}** window "
@@ -650,26 +702,21 @@ with tabs[4]:
     with c1:
         st.markdown("**Average duration by time window.**")
         if len(by_peak) > 0:
-            fig, ax = plt.subplots(figsize=(5, 4))
-            ax.bar(by_peak.index, by_peak.values, color=[LINE, ACCENT, WARN][:len(by_peak)])
-            ax.set_ylabel("Avg. duration (min)")
-            ax.tick_params(axis="x", rotation=15)
-            ax.grid(axis="y", alpha=0.25)
-            for spine in ("top", "right"):
-                ax.spines[spine].set_visible(False)
-            plt.tight_layout()
-            st.pyplot(fig)
+            fig = go.Figure(go.Bar(
+                x=by_peak.index, y=by_peak.values,
+                marker_color=[LINE, ACCENT, WARN][:len(by_peak)],
+                hovertemplate="%{x}<br>%{y:.0f} min avg<extra></extra>",
+            ))
+            style_fig(fig, height=380, yaxis_title="Avg. duration (min)")
+            st.plotly_chart(fig, use_container_width=True)
     with c2:
         st.markdown("**Overall duration distribution.**")
-        fig, ax = plt.subplots(figsize=(6, 4))
-        ax.hist(durations, bins=30, color=ACCENT, edgecolor=BG)
-        ax.set_xlabel("Duration (minutes)")
-        ax.set_ylabel("Trips")
-        ax.grid(axis="y", alpha=0.25)
-        for spine in ("top", "right"):
-            ax.spines[spine].set_visible(False)
-        plt.tight_layout()
-        st.pyplot(fig)
+        fig = go.Figure(go.Histogram(
+            x=durations, nbinsx=30, marker_color=ACCENT, marker_line_color=BG, marker_line_width=1,
+            hovertemplate="%{x:.0f} min<br>%{y:,} trips<extra></extra>",
+        ))
+        style_fig(fig, height=380, xaxis_title="Duration (minutes)", yaxis_title="Trips")
+        st.plotly_chart(fig, use_container_width=True)
 
 # ============================================================ TAB: DATA QUALITY
 with tabs[5]:
@@ -696,14 +743,14 @@ with tabs[5]:
     sizes = corridor_group.size()
     missing_by_corridor = missing_by_corridor[sizes >= 20].sort_values(ascending=False).head(10).sort_values()
     if len(missing_by_corridor) > 0:
-        fig, ax = plt.subplots(figsize=(9, 4.5))
-        ax.barh(missing_by_corridor.index, missing_by_corridor.values, color=WARN)
-        ax.set_xlabel("% of trips with a gap")
-        ax.grid(axis="x", alpha=0.25)
-        for spine in ("top", "right"):
-            ax.spines[spine].set_visible(False)
-        plt.tight_layout()
-        st.pyplot(fig)
+        confidence_badge("Weak")
+        fig = go.Figure(go.Bar(
+            x=missing_by_corridor.values, y=missing_by_corridor.index, orientation="h",
+            marker_color=WARN,
+            hovertemplate="%{y}<br>%{x:.1f}% of trips have a gap<extra></extra>",
+        ))
+        style_fig(fig, height=360, xaxis_title="% of trips with a gap")
+        st.plotly_chart(fig, use_container_width=True)
         st.caption(
             "Weak signal by design: these corridors have relatively small sample sizes, so a "
             "few incomplete records move the percentage a lot. Read this as something to keep "
@@ -717,20 +764,50 @@ with tabs[5]:
     missing_by_day = df.groupby("_day_name").apply(
         lambda g: g[["tapOutTime", "corridorID"]].isna().any(axis=1).mean() * 100
     ).reindex(order)
-    fig, ax = plt.subplots(figsize=(10, 3.5))
     colors = [ACCENT if d not in ("Saturday", "Sunday") else LINE for d in order]
-    ax.bar(missing_by_day.index, missing_by_day.values, color=colors)
-    ax.set_ylabel("% of trips with a gap")
-    ax.grid(axis="y", alpha=0.25)
-    for spine in ("top", "right"):
-        ax.spines[spine].set_visible(False)
-    plt.tight_layout()
-    st.pyplot(fig)
+    fig = go.Figure(go.Bar(
+        x=missing_by_day.index, y=missing_by_day.values, marker_color=colors,
+        hovertemplate="%{x}<br>%{y:.1f}% of trips have a gap<extra></extra>",
+    ))
+    style_fig(fig, height=320, yaxis_title="% of trips with a gap")
+    st.plotly_chart(fig, use_container_width=True)
     st.caption(
         "If these bars sit close together (as they typically do across the full month), that's "
         "itself the finding: incomplete records aren't concentrated on a particular day, which "
         "points toward a general data-capture issue rather than a day-specific one."
     )
+
+    st.markdown(
+        """
+        <div class="data-disclosure">
+        <b>Scope note.</b> The Corridors & Map tab shows where trip <i>demand</i> is concentrated,
+        not where service <i>access</i> is genuinely weak. A true access-gap analysis - identifying
+        underserved areas relative to population - would need census or population-density data
+        cross-referenced against stop coverage, which isn't part of this dataset. Treat the map as
+        a demand-density view, not a service-equity finding.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+# ============================================================ TAB: EXECUTIVE BRIEF
+with tabs[6]:
+    section_label("07", "Executive Brief")
+    st.subheader("Findings and recommendations, synthesized")
+    st.caption(
+        "The same document that lives at `Docs/EXECUTIVE_BRIEF.md` in the repository, rendered "
+        "here so it's visible without leaving the dashboard."
+    )
+    brief_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Docs", "EXECUTIVE_BRIEF.md")
+    try:
+        with open(brief_path, "r", encoding="utf-8") as f:
+            brief_text = f.read()
+        st.markdown(brief_text)
+    except FileNotFoundError:
+        st.warning(
+            "Couldn't find `Docs/EXECUTIVE_BRIEF.md` next to app.py - make sure the `Docs` "
+            "folder ships with the repo alongside app.py."
+        )
 
 st.divider()
 st.caption(
