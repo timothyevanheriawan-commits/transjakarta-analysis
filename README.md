@@ -5,6 +5,17 @@ A data analysis project looking at passenger demand, service access, and data qu
 across the Transjakarta bus network. Framed as if the analysis was done for Transjakarta's
 Operations & Planning team.
 
+## Key Findings
+
+The transaction data is synthetic (April 2023, built on the real route network), so every finding below is labeled by how far it can be trusted.
+
+- **Weekday demand is about 4.6x weekend demand** (1,709.9 vs 370.2 trips per day). Strong: large sample, holds across the full month.
+- **Cibubur to Balai Kota is the busiest and most volatile corridor** (391 trips). Moderate: a signal of possible capacity pressure, not proof, since there are no bus counts to check against.
+- **Evening peak trips run longer than morning peak** (83.8 vs 60.1 minutes). Moderate: duration is generated, not measured, so this is a hypothesis for real GPS data.
+- **Missing-record rates differ slightly by corridor** (8.6% to 11% vs a 6% baseline). Weak: close to noise on small samples, so monitor rather than act.
+
+Only the weekday/weekend gap is strong enough to act on. The rest needs real operational data.
+
 ## Data disclosure
 
 This project uses the dataset **`dikisahkan/transjakarta-transportation-transaction`**
